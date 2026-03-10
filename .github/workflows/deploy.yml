@@ -1,0 +1,53 @@
+name: Deploy To Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT != '' && secrets.DEPLOY_PORT || '22' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy Project Files To Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          port: ${{ env.DEPLOY_PORT }}
+          target: ${{ secrets.DEPLOY_PATH }}
+          overwrite: true
+          source: |
+            app
+            requirements.txt
+            .env.example
+            README.md
+            README.zh-CN.md
+            README.en.md
+            README.ru.md
+            run.ps1
+            deploy_remote.py
+
+      - name: Install Dependencies And Restart Service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
+          port: ${{ env.DEPLOY_PORT }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            if [ ! -x .venv/bin/python3 ]; then
+              python3 -m venv .venv
+            fi
+            .venv/bin/python3 -m pip install -r requirements.txt --progress-bar off
+            echo "${{ secrets.DEPLOY_PASSWORD }}" | sudo -S systemctl restart "${{ secrets.DEPLOY_SERVICE }}"
+            systemctl is-active "${{ secrets.DEPLOY_SERVICE }}"
