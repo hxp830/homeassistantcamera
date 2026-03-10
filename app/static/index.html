@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YOLO 多路手势识别管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+      background: #0f172a; /* Slate 900 */
+      color: #e2e8f0; /* Slate 200 */
+      margin: 0;
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.7); /* Slate 800 with opacity */
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    }
+    input, select {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f8fafc;
+      transition: all 0.3s ease;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #38bdf8; /* Sky 400 */
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: white;
+      transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0369a1, #1d4ed8);
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      color: white;
+      transition: all 0.3s ease;
+    }
+    .btn-danger:hover {
+      background: linear-gradient(135deg, #b91c1c, #7f1d1d);
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(71, 85, 105, 0.5);
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.3s ease;
+    }
+    .btn-secondary:hover {
+      background: rgba(71, 85, 105, 0.8);
+    }
+    .btn-icon {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      transition: all 0.2s ease;
+    }
+    .btn-icon:hover {
+      color: #38bdf8;
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+    }
+    .canvas-container {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .canvas-container canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      cursor: zoom-in;
+      transition: opacity 0.3s;
+    }
+    .canvas-container:hover canvas {
+      opacity: 0.9;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      background: rgba(16, 185, 129, 0.1);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.2);
+    }
+    /* Modal styles */
+    .modal-overlay {
+      background: rgba(2, 6, 23, 0.85);
+      backdrop-filter: blur(8px);
+    }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    /* Toast notifications */
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #e2e8f0;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      transform: translateX(120%);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .toast.show {
+      transform: translateX(0);
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+  
+  <div id="toast-container"></div>
+  
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+        </div>
+        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400" data-i18n="header_title">YOLO 智能手势识别中心</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <select id="langSwitch" onchange="setLanguage(this.value)" class="px-2.5 py-1.5 rounded-lg text-xs bg-slate-800/70 border border-slate-700 text-slate-200">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+        </select>
+        <div id="status" class="status-badge" data-i18n="status_loading">加载中...</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-6">
+    
+    <!-- Top Row: Config & Models -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Video Source Adding -->
+      <div class="glass-card p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          <h2 class="text-lg font-semibold text-white" data-i18n="section_add_source">新增视频源</h2>
+        </div>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input id="newName" class="w-full px-4 py-2.5 rounded-lg text-sm" data-i18n-placeholder="placeholder_camera_name" placeholder="摄像头名称（如：客厅）" />
+            <input id="newSource" class="w-full px-4 py-2.5 rounded-lg text-sm" data-i18n-placeholder="placeholder_stream" placeholder="流地址 (rtsp://... 或 /dev/video0)" />
+          </div>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <input id="newLabels" class="flex-1 px-4 py-2.5 rounded-lg text-sm" data-i18n-placeholder="placeholder_labels_optional" placeholder="推送标签，逗号分隔（选填）" />
+            <button onclick="addSource()" class="btn-primary px-6 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+              <span data-i18n="btn_add">添加</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model Management -->
+      <div class="glass-card p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+          <h2 class="text-lg font-semibold text-white" data-i18n="section_model_mgmt">模型管理</h2>
+        </div>
+        <div class="space-y-4">
+          <div class="flex items-center gap-4">
+            <input type="file" id="modelFile" accept=".pt" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-700 file:text-sky-400 hover:file:bg-slate-600 transition-all cursor-pointer bg-slate-800/50 rounded-lg border border-slate-700" />
+            <button onclick="uploadModel()" class="btn-secondary px-6 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap" data-i18n="btn_upload">上传</button>
+          </div>
+          <div class="flex items-center gap-4">
+            <select id="modelSelect" onchange="onGlobalModelChange(this.value)" class="flex-1 px-4 py-2.5 rounded-lg text-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:0.65rem_auto] pr-10"></select>
+            <button onclick="activateModel()" class="btn-primary px-6 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap" data-i18n="btn_apply_global_model">应用全局模型</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MQTT Settings (Collapsible) -->
+    <details class="glass-card group" open>
+      <summary class="p-6 cursor-pointer flex items-center justify-between list-none">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path></svg>
+          <h2 class="text-lg font-semibold text-white" data-i18n="section_mqtt">MQTT 桥接设置</h2>
+        </div>
+        <svg class="w-5 h-5 text-slate-400 group-open:-rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </summary>
+      <div class="px-6 pb-6 pt-2 border-t border-slate-700/50 space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="space-y-1">
+            <label class="text-xs text-slate-400 font-medium ml-1" data-i18n="label_mqtt_host">主机地址</label>
+            <input id="mqttHost" class="w-full px-4 py-2 rounded-lg text-sm" placeholder="192.168.1.x" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs text-slate-400 font-medium ml-1" data-i18n="label_mqtt_port">端口</label>
+            <input id="mqttPort" class="w-full px-4 py-2 rounded-lg text-sm" placeholder="1883" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs text-slate-400 font-medium ml-1" data-i18n="label_mqtt_user">用户名</label>
+            <input id="mqttUser" class="w-full px-4 py-2 rounded-lg text-sm" placeholder="User" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs text-slate-400 font-medium ml-1" data-i18n="label_mqtt_password">密码</label>
+            <input id="mqttPassword" class="w-full px-4 py-2 rounded-lg text-sm" type="password" placeholder="Password" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-1">
+            <label class="text-xs text-slate-400 font-medium ml-1" data-i18n="label_mqtt_client_id">客户端 ID</label>
+            <input id="mqttClientId" class="w-full px-4 py-2 rounded-lg text-sm" placeholder="gesture_yolo_client" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs text-slate-400 font-medium ml-1" data-i18n="label_mqtt_discovery">Discovery 前缀 (HA)</label>
+            <input id="mqttDiscovery" class="w-full px-4 py-2 rounded-lg text-sm" placeholder="homeassistant" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs text-slate-400 font-medium ml-1" data-i18n="label_mqtt_state_topic">基础 State Topic</label>
+            <input id="mqttStateTopic" class="w-full px-4 py-2 rounded-lg text-sm" placeholder="gesture_yolo_ha/state" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button onclick="testMqtt()" class="btn-secondary px-6 py-2 rounded-lg text-sm font-medium" data-i18n="btn_test_connection">测试连接</button>
+          <button onclick="saveMqtt()" class="btn-primary px-6 py-2 rounded-lg text-sm font-medium" data-i18n="btn_save_apply">保存并应用</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- Multi-View Grid -->
+    <div>
+      <div class="flex items-center gap-2 mb-6 ml-2">
+        <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+        <h2 class="text-xl font-bold text-white tracking-wide" data-i18n="section_live_matrix">实时监控矩阵</h2>
+      </div>
+      <div id="sourceGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- JS generated tiles -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Zoom Modal -->
+  <div id="zoomModal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4 transition-opacity" onclick="toggleZoom('')">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80">
+        <h3 id="zoomTitle" class="text-lg font-semibold text-white" data-i18n="zoom_title">视频放大</h3>
+        <button class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800" onclick="toggleZoom('')">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-4 bg-black">
+        <canvas id="zoomCanvas" class="w-full h-auto rounded-lg"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const renderLoops = new Map();
+    let availableModels = [];
+    let pendingGlobalModel = '';
+    const pendingSourceModels = new Map();
+    const pendingSourceNames = new Map();
+    const pendingSourceLabels = new Map();
+    const latestSourceStatus = new Map();
+    let zoomSourceId = '';
+    let zoomRunning = false;
+    const LANG_KEY = 'gesture_ui_lang';
+    const SUPPORTED_LANGS = ['zh', 'en', 'ru'];
+    let currentLang = (localStorage.getItem(LANG_KEY) || 'zh').toLowerCase();
+    if (!SUPPORTED_LANGS.includes(currentLang)) currentLang = 'zh';
+
+    const I18N = {
+      zh: {
+        page_title: 'YOLO 多路手势识别管理',
+        header_title: 'YOLO 智能手势识别中心',
+        status_loading: '加载中...',
+        status_current_model: '当前模型',
+        status_devices_online: '设备在线',
+        section_add_source: '新增视频源',
+        section_model_mgmt: '模型管理',
+        section_mqtt: 'MQTT 桥接设置',
+        section_live_matrix: '实时监控矩阵',
+        zoom_title: '视频放大',
+        zoom_preview: '全屏预览: {name}',
+        placeholder_camera_name: '摄像头名称（如：客厅）',
+        placeholder_stream: '流地址 (rtsp://... 或 /dev/video0)',
+        placeholder_labels_optional: '推送标签，逗号分隔（选填）',
+        placeholder_custom_name: '自定义名称',
+        placeholder_push_labels: '推送标签(逗号分隔)',
+        btn_add: '添加',
+        btn_upload: '上传',
+        btn_apply_global_model: '应用全局模型',
+        btn_test_connection: '测试连接',
+        btn_save_apply: '保存并应用',
+        btn_save: '保存',
+        label_mqtt_host: '主机地址',
+        label_mqtt_port: '端口',
+        label_mqtt_user: '用户名',
+        label_mqtt_password: '密码',
+        label_mqtt_client_id: '客户端 ID',
+        label_mqtt_discovery: 'Discovery 前缀 (HA)',
+        label_mqtt_state_topic: '基础 State Topic',
+        title_clone_card: '复制视频卡',
+        title_delete: '删除',
+        title_copy_mqtt: '复制 MQTT 地址',
+        model_mediapipe: 'Google MediaPipe 手势识别模型',
+        toast_copy_ok: '已复制到剪贴板！',
+        toast_copy_fail: '复制失败，请手动选择复制。',
+        err_timeout: '请求超时，请检查地址和网络连通性',
+        toast_mqtt_saved: 'MQTT 配置已保存并生效',
+        toast_save_failed: '保存失败: {msg}',
+        toast_mqtt_test_ok: 'MQTT 测试成功',
+        toast_mqtt_test_fail: 'MQTT 测试失败: {msg}',
+        err_need_source: '请输入视频源',
+        toast_source_added: '视频源添加成功',
+        toast_source_saved: '设备设置已保存',
+        err_source_read_failed: '无法读取源配置，请稍后重试',
+        toast_source_cloned: '已复制视频卡',
+        toast_clone_failed: '复制失败: {msg}',
+        confirm_delete_source: '确定要删除此视频源吗？',
+        toast_source_deleted: '视频源已删除',
+        err_choose_pt: '请选择 .pt 文件',
+        toast_upload_done: '模型上传完成',
+        err_no_model: '没有可选模型',
+        toast_model_switched: '已切换全局模型',
+        status_init_failed: '初始化失败: {msg}'
+      },
+      en: {
+        page_title: 'YOLO Multi-Source Gesture Recognition',
+        header_title: 'YOLO Smart Gesture Center',
+        status_loading: 'Loading...',
+        status_current_model: 'Current model',
+        status_devices_online: 'Devices online',
+        section_add_source: 'Add Video Source',
+        section_model_mgmt: 'Model Management',
+        section_mqtt: 'MQTT Bridge Settings',
+        section_live_matrix: 'Live Monitoring Matrix',
+        zoom_title: 'Zoomed Video',
+        zoom_preview: 'Fullscreen Preview: {name}',
+        placeholder_camera_name: 'Camera name (e.g. Living Room)',
+        placeholder_stream: 'Stream URL (rtsp://... or /dev/video0)',
+        placeholder_labels_optional: 'Publish labels, comma separated (optional)',
+        placeholder_custom_name: 'Custom name',
+        placeholder_push_labels: 'Publish labels (comma separated)',
+        btn_add: 'Add',
+        btn_upload: 'Upload',
+        btn_apply_global_model: 'Apply Global Model',
+        btn_test_connection: 'Test Connection',
+        btn_save_apply: 'Save & Apply',
+        btn_save: 'Save',
+        label_mqtt_host: 'Host',
+        label_mqtt_port: 'Port',
+        label_mqtt_user: 'Username',
+        label_mqtt_password: 'Password',
+        label_mqtt_client_id: 'Client ID',
+        label_mqtt_discovery: 'Discovery Prefix (HA)',
+        label_mqtt_state_topic: 'Base State Topic',
+        title_clone_card: 'Clone Video Card',
+        title_delete: 'Delete',
+        title_copy_mqtt: 'Copy MQTT Topic',
+        model_mediapipe: 'Google MediaPipe Gesture Model',
+        toast_copy_ok: 'Copied to clipboard!',
+        toast_copy_fail: 'Copy failed. Please copy manually.',
+        err_timeout: 'Request timeout. Please check network connectivity.',
+        toast_mqtt_saved: 'MQTT configuration saved and applied.',
+        toast_save_failed: 'Save failed: {msg}',
+        toast_mqtt_test_ok: 'MQTT test successful',
+        toast_mqtt_test_fail: 'MQTT test failed: {msg}',
+        err_need_source: 'Please enter a video source',
+        toast_source_added: 'Video source added',
+        toast_source_saved: 'Device settings saved',
+        err_source_read_failed: 'Failed to read source config. Please retry.',
+        toast_source_cloned: 'Video card cloned',
+        toast_clone_failed: 'Clone failed: {msg}',
+        confirm_delete_source: 'Are you sure you want to delete this source?',
+        toast_source_deleted: 'Video source deleted',
+        err_choose_pt: 'Please choose a .pt file',
+        toast_upload_done: 'Model upload completed',
+        err_no_model: 'No model available',
+        toast_model_switched: 'Global model switched',
+        status_init_failed: 'Initialization failed: {msg}'
+      },
+      ru: {
+        page_title: 'YOLO Многопоточное распознавание жестов',
+        header_title: 'YOLO Центр распознавания жестов',
+        status_loading: 'Загрузка...',
+        status_current_model: 'Текущая модель',
+        status_devices_online: 'Устройств онлайн',
+        section_add_source: 'Добавить видеопоток',
+        section_model_mgmt: 'Управление моделями',
+        section_mqtt: 'Настройки MQTT-моста',
+        section_live_matrix: 'Матрица онлайн-мониторинга',
+        zoom_title: 'Увеличенное видео',
+        zoom_preview: 'Полный экран: {name}',
+        placeholder_camera_name: 'Имя камеры (например, Гостиная)',
+        placeholder_stream: 'URL потока (rtsp://... или /dev/video0)',
+        placeholder_labels_optional: 'Метки публикации через запятую (опционально)',
+        placeholder_custom_name: 'Пользовательское имя',
+        placeholder_push_labels: 'Метки публикации (через запятую)',
+        btn_add: 'Добавить',
+        btn_upload: 'Загрузить',
+        btn_apply_global_model: 'Применить глобальную модель',
+        btn_test_connection: 'Проверить соединение',
+        btn_save_apply: 'Сохранить и применить',
+        btn_save: 'Сохранить',
+        label_mqtt_host: 'Хост',
+        label_mqtt_port: 'Порт',
+        label_mqtt_user: 'Имя пользователя',
+        label_mqtt_password: 'Пароль',
+        label_mqtt_client_id: 'ID клиента',
+        label_mqtt_discovery: 'Префикс Discovery (HA)',
+        label_mqtt_state_topic: 'Базовый State Topic',
+        title_clone_card: 'Клонировать карточку',
+        title_delete: 'Удалить',
+        title_copy_mqtt: 'Копировать MQTT Topic',
+        model_mediapipe: 'Модель жестов Google MediaPipe',
+        toast_copy_ok: 'Скопировано в буфер обмена!',
+        toast_copy_fail: 'Не удалось скопировать. Скопируйте вручную.',
+        err_timeout: 'Тайм-аут запроса. Проверьте сеть.',
+        toast_mqtt_saved: 'Настройки MQTT сохранены и применены.',
+        toast_save_failed: 'Ошибка сохранения: {msg}',
+        toast_mqtt_test_ok: 'Проверка MQTT успешна',
+        toast_mqtt_test_fail: 'Ошибка проверки MQTT: {msg}',
+        err_need_source: 'Введите видеопоток',
+        toast_source_added: 'Видеопоток добавлен',
+        toast_source_saved: 'Настройки устройства сохранены',
+        err_source_read_failed: 'Не удалось прочитать конфигурацию источника.',
+        toast_source_cloned: 'Карточка клонирована',
+        toast_clone_failed: 'Ошибка клонирования: {msg}',
+        confirm_delete_source: 'Удалить этот источник?',
+        toast_source_deleted: 'Видеопоток удален',
+        err_choose_pt: 'Выберите файл .pt',
+        toast_upload_done: 'Загрузка модели завершена',
+        err_no_model: 'Нет доступной модели',
+        toast_model_switched: 'Глобальная модель переключена',
+        status_init_failed: 'Ошибка инициализации: {msg}'
+      }
+    };
+    const modelNameMap = {
+      mediapipe_hands: () => t('model_mediapipe')
+    };
+
+    function t(key, vars) {
+      const langPack = I18N[currentLang] || I18N.zh;
+      let text = langPack[key] || I18N.zh[key] || key;
+      if (vars && typeof vars === 'object') {
+        Object.keys(vars).forEach(k => {
+          text = text.replaceAll(`{${k}}`, String(vars[k]));
+        });
+      }
+      return text;
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : currentLang;
+      document.title = t('page_title');
+      const langEl = document.getElementById('langSwitch');
+      if (langEl) langEl.value = currentLang;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        el.textContent = t(el.dataset.i18n);
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        el.placeholder = t(el.dataset.i18nPlaceholder);
+      });
+      document.querySelectorAll('[id^="name-"]').forEach(el => { el.placeholder = t('placeholder_custom_name'); });
+      document.querySelectorAll('[id^="labels-"]').forEach(el => { el.placeholder = t('placeholder_push_labels'); });
+      document.querySelectorAll('button[onclick^="saveSourceConfig("]').forEach(el => { el.textContent = t('btn_save'); });
+      document.querySelectorAll('button[onclick^="cloneSource("]').forEach(el => { el.title = t('title_clone_card'); });
+      document.querySelectorAll('button[onclick^="removeSource("]').forEach(el => { el.title = t('title_delete'); });
+      document.querySelectorAll('button[onclick^="copyToClipboard("]').forEach(el => { el.title = t('title_copy_mqtt'); });
+    }
+
+    function setLanguage(lang) {
+      const next = (lang || '').toLowerCase();
+      if (!SUPPORTED_LANGS.includes(next)) return;
+      currentLang = next;
+      localStorage.setItem(LANG_KEY, currentLang);
+      applyLanguage();
+      refreshModels().catch(() => {});
+      refreshStatus().catch(() => {});
+    }
+
+    function getModelDisplayName(name) {
+      const handler = modelNameMap[name];
+      return typeof handler === 'function' ? handler() : (handler || name);
+    }
+
+    function renderSourceModelOptions(sourceId, selectedModel) {
+      const sel = document.getElementById(`model-${sourceId}`);
+      if (!sel) return;
+      const isFocused = document.activeElement === sel;
+      const current = sel.value || '';
+      const next = selectedModel || current || '';
+      const oldValues = Array.from(sel.options).map(o => o.value);
+      const listChanged = oldValues.length !== availableModels.length || oldValues.some((v, i) => v !== availableModels[i]);
+      if (listChanged) {
+        sel.innerHTML = '';
+        availableModels.forEach(m => {
+          const o = document.createElement('option');
+          o.value = m;
+          o.textContent = getModelDisplayName(m);
+          sel.appendChild(o);
+        });
+      }
+      const finalValue = isFocused ? current : next;
+      if (finalValue && availableModels.includes(finalValue)) {
+        sel.value = finalValue;
+      }
+    }
+
+    function onSourceModelChange(sourceId, value) {
+      pendingSourceModels.set(sourceId, value);
+    }
+
+    function onSourceNameInput(sourceId, value) {
+      pendingSourceNames.set(sourceId, value);
+    }
+
+    function onSourceLabelsInput(sourceId, value) {
+      pendingSourceLabels.set(sourceId, value);
+    }
+
+    function onGlobalModelChange(value) {
+      pendingGlobalModel = value || '';
+    }
+    
+    // Toast notification system
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      let icon = '';
+      if (type === 'success') {
+        icon = `<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+      } else {
+        icon = `<svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+      }
+      
+      toast.innerHTML = `${icon} <span class="text-sm font-medium">${message}</span>`;
+      container.appendChild(toast);
+      
+      // Trigger reflow to apply animation
+      setTimeout(() => {
+        toast.classList.add('show');
+      }, 10);
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    // Copy to clipboard function
+    async function copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(t('toast_copy_ok'));
+      } catch (err) {
+        // Fallback for older browsers
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          showToast(t('toast_copy_ok'));
+        } catch (e) {
+          showToast(t('toast_copy_fail'), 'error');
+        }
+        document.body.removeChild(textArea);
+      }
+    }
+
+    function parseErrorText(text) {
+      try {
+        const obj = JSON.parse(text);
+        if (obj.detail) return typeof obj.detail === 'string' ? obj.detail : JSON.stringify(obj.detail);
+      } catch (_) {}
+      return text || 'Unknown error';
+    }
+
+    async function fetchJson(url, opt, timeoutMs = 10000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const r = await fetch(url, { ...(opt || {}), signal: controller.signal });
+        const text = await r.text();
+        if (!r.ok) throw new Error(parseErrorText(text));
+        return text ? JSON.parse(text) : {};
+      } catch (e) {
+        if (e.name === 'AbortError') throw new Error(t('err_timeout'));
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function refreshModels() {
+      const data = await fetchJson('/api/models');
+      availableModels = Array.isArray(data.models) ? data.models : [];
+      const sel = document.getElementById('modelSelect');
+      const oldGlobal = pendingGlobalModel || sel.value || '';
+      sel.innerHTML = '';
+      availableModels.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m;
+        o.textContent = getModelDisplayName(m);
+        sel.appendChild(o);
+      });
+      if (oldGlobal && availableModels.includes(oldGlobal)) {
+        sel.value = oldGlobal;
+      }
+      document.querySelectorAll('[id^="model-"]').forEach(el => {
+        const sourceId = el.id.replace('model-', '');
+        renderSourceModelOptions(sourceId, pendingSourceModels.get(sourceId) || el.value);
+      });
+    }
+
+    async function refreshMqtt() {
+      const m = await fetchJson('/api/mqtt');
+      document.getElementById('mqttHost').value = m.host || '';
+      document.getElementById('mqttPort').value = m.port || 1883;
+      document.getElementById('mqttUser').value = m.user || '';
+      document.getElementById('mqttPassword').value = m.password || '';
+      document.getElementById('mqttClientId').value = m.client_id || '';
+      document.getElementById('mqttDiscovery').value = m.discovery_prefix || '';
+      document.getElementById('mqttStateTopic').value = m.state_topic || '';
+    }
+
+    async function saveMqtt() {
+      const payload = {
+        host: document.getElementById('mqttHost').value.trim(),
+        port: Number(document.getElementById('mqttPort').value || 1883),
+        user: document.getElementById('mqttUser').value,
+        password: document.getElementById('mqttPassword').value,
+        client_id: document.getElementById('mqttClientId').value.trim(),
+        discovery_prefix: document.getElementById('mqttDiscovery').value.trim(),
+        state_topic: document.getElementById('mqttStateTopic').value.trim()
+      };
+      try {
+        await fetchJson('/api/mqtt', {
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        }, 12000);
+        showToast(t('toast_mqtt_saved'));
+      } catch (e) {
+        showToast(t('toast_save_failed', { msg: e.message }), 'error');
+      }
+    }
+
+    async function testMqtt() {
+      const payload = {
+        host: document.getElementById('mqttHost').value.trim(),
+        port: Number(document.getElementById('mqttPort').value || 1883),
+        user: document.getElementById('mqttUser').value,
+        password: document.getElementById('mqttPassword').value,
+        client_id: document.getElementById('mqttClientId').value.trim(),
+        discovery_prefix: document.getElementById('mqttDiscovery').value.trim(),
+        state_topic: document.getElementById('mqttStateTopic').value.trim()
+      };
+      try {
+        const r = await fetchJson('/api/mqtt/test', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        }, 8000);
+        showToast(r.message || t('toast_mqtt_test_ok'));
+      } catch (e) {
+        showToast(t('toast_mqtt_test_fail', { msg: e.message }), 'error');
+      }
+    }
+
+    function ensureTile(source) {
+      const grid = document.getElementById('sourceGrid');
+      let tile = document.getElementById(`tile-${source.source_id}`);
+      if (tile) return tile;
+
+      tile = document.createElement('div');
+      tile.className = 'glass-card flex flex-col overflow-hidden';
+      tile.id = `tile-${source.source_id}`;
+      tile.innerHTML = `
+        <div class="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/30">
+          <strong id="title-${source.source_id}" class="text-white font-semibold truncate pr-2">${source.name || source.source_id}</strong>
+          <div class="flex items-center gap-1">
+            <button onclick="cloneSource('${source.source_id}')" class="text-slate-400 hover:text-sky-400 transition-colors p-1" title="${t('title_clone_card')}">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2M8 16h8a2 2 0 002-2V8M8 16a2 2 0 002 2h8a2 2 0 002-2v-4a2 2 0 00-2-2h-2"></path></svg>
+            </button>
+            <button onclick="removeSource('${source.source_id}')" class="text-slate-400 hover:text-red-400 transition-colors p-1" title="${t('title_delete')}">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+          </div>
+        </div>
+        
+        <div class="p-4 flex-1 flex flex-col gap-3">
+          <div class="canvas-container shadow-inner">
+            <canvas id="canvas-${source.source_id}" onclick="toggleZoom('${source.source_id}', document.getElementById('title-${source.source_id}').textContent)"></canvas>
+            
+            <div class="absolute bottom-2 left-2 right-2 flex justify-between items-end pointer-events-none">
+              <div id="detect-${source.source_id}" class="bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs font-mono text-emerald-400 border border-emerald-500/20"></div>
+            </div>
+          </div>
+          
+          <div class="space-y-2 mt-2">
+            <input id="name-${source.source_id}" oninput="onSourceNameInput('${source.source_id}', this.value)" class="w-full px-3 py-1.5 rounded-md text-xs" placeholder="${t('placeholder_custom_name')}" />
+            <input id="labels-${source.source_id}" oninput="onSourceLabelsInput('${source.source_id}', this.value)" class="w-full px-3 py-1.5 rounded-md text-xs" placeholder="${t('placeholder_push_labels')}" />
+            <select id="model-${source.source_id}" onchange="onSourceModelChange('${source.source_id}', this.value)" class="w-full px-3 py-1.5 rounded-md text-xs"></select>
+            <div class="flex items-center justify-between pt-1 gap-2">
+              <div class="flex-1 min-w-0 flex items-center bg-slate-800/50 rounded-md px-2 py-1 border border-slate-700">
+                <div class="text-[10px] text-slate-400 truncate select-all" id="topic-${source.source_id}" title="MQTT Topic"></div>
+              </div>
+              <button onclick="copyToClipboard(document.getElementById('topic-${source.source_id}').innerText)" class="btn-icon p-1.5 rounded-md flex-shrink-0" title="${t('title_copy_mqtt')}">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              </button>
+              <button onclick="saveSourceConfig('${source.source_id}')" class="text-xs btn-primary px-3 py-1.5 rounded-md shadow-sm ml-1">${t('btn_save')}</button>
+            </div>
+          </div>
+        </div>
+      `;
+      grid.appendChild(tile);
+      renderSourceModelOptions(source.source_id, source.model || '');
+      startRenderLoop(source.source_id);
+      return tile;
+    }
+
+    function startRenderLoop(sourceId) {
+      if (renderLoops.has(sourceId)) return;
+      let running = true;
+      renderLoops.set(sourceId, () => { running = false; });
+
+      const canvas = document.getElementById(`canvas-${sourceId}`);
+      const ctx = canvas.getContext('2d');
+
+      async function tick() {
+        if (!running) return;
+        try {
+          const r = await fetch(`/snapshot/${sourceId}.jpg?t=${Date.now()}`, { cache:'no-store' });
+          if (r.ok) {
+            const blob = await r.blob();
+            const bmp = await createImageBitmap(blob);
+            if (!canvas.width || !canvas.height) {
+              canvas.width = bmp.width;
+              canvas.height = bmp.height;
+            }
+            ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+            bmp.close();
+          }
+        } catch (_) {}
+        setTimeout(tick, 120);
+      }
+      tick();
+    }
+
+    function stopRenderLoop(sourceId) {
+      const stop = renderLoops.get(sourceId);
+      if (stop) stop();
+      renderLoops.delete(sourceId);
+    }
+
+    function toggleZoom(sourceId, sourceName) {
+      const modal = document.getElementById('zoomModal');
+      if (!sourceId || sourceId === zoomSourceId) {
+        zoomSourceId = '';
+        zoomRunning = false;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        return;
+      }
+      zoomSourceId = sourceId;
+      zoomRunning = true;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      
+      const displayName = sourceName || (document.getElementById(`title-${sourceId}`) ? document.getElementById(`title-${sourceId}`).textContent : sourceId);
+      document.getElementById('zoomTitle').textContent = t('zoom_preview', { name: displayName });
+      
+      startZoomLoop();
+    }
+
+    async function startZoomLoop() {
+      const canvas = document.getElementById('zoomCanvas');
+      const ctx = canvas.getContext('2d');
+      while (zoomRunning && zoomSourceId) {
+        try {
+          const r = await fetch(`/snapshot/${zoomSourceId}.jpg?t=${Date.now()}`, { cache:'no-store' });
+          if (r.ok) {
+            const blob = await r.blob();
+            const bmp = await createImageBitmap(blob);
+            if (!canvas.width || !canvas.height) {
+              canvas.width = bmp.width;
+              canvas.height = bmp.height;
+            }
+            ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+            bmp.close();
+          }
+        } catch (_) {}
+        await new Promise(res => setTimeout(res, 80));
+      }
+    }
+
+    async function refreshStatus() {
+      const s = await fetchJson('/api/status');
+      document.getElementById('status').innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
+        ${t('status_current_model')}: <strong class="ml-1 mr-3 text-white">${getModelDisplayName(s.model)}</strong> 
+        ${t('status_devices_online')}: <strong class="ml-1 text-white">${s.sources.length}</strong>
+      `;
+      const globalSel = document.getElementById('modelSelect');
+      const isGlobalFocused = document.activeElement === globalSel;
+      const globalTarget = pendingGlobalModel || s.model;
+      if (!isGlobalFocused && globalTarget && availableModels.includes(globalTarget)) {
+        globalSel.value = globalTarget;
+      }
+
+      const alive = new Set();
+      s.sources.forEach(src => {
+        latestSourceStatus.set(src.source_id, src);
+        alive.add(src.source_id);
+        ensureTile(src);
+        document.getElementById(`title-${src.source_id}`).textContent = src.name || src.source_id;
+        const pendingName = pendingSourceNames.get(src.source_id);
+        const pendingLabels = pendingSourceLabels.get(src.source_id);
+        document.getElementById(`name-${src.source_id}`).value = pendingName !== undefined ? pendingName : (src.name || src.source_id);
+        document.getElementById(`labels-${src.source_id}`).value = pendingLabels !== undefined ? pendingLabels : (src.labels_text || '');
+        const pendingModel = pendingSourceModels.get(src.source_id);
+        renderSourceModelOptions(src.source_id, pendingModel || src.model || s.model || '');
+        
+        const base = (document.getElementById('mqttStateTopic').value || 'gesture_yolo_ha/state').trim();
+        document.getElementById(`topic-${src.source_id}`).textContent = `${base}/${src.source_id}`;
+        
+        const detectEl = document.getElementById(`detect-${src.source_id}`);
+        if(src.latest.gesture && src.latest.gesture !== 'none') {
+            detectEl.innerHTML = `<span class="text-white">${src.latest.gesture}</span> <span class="text-emerald-500/70 ml-1">${(src.latest.confidence * 100).toFixed(0)}%</span>`;
+            detectEl.style.display = 'block';
+        } else {
+            detectEl.style.display = 'none';
+        }
+      });
+
+      [...renderLoops.keys()].forEach(id => {
+        if (!alive.has(id)) {
+          stopRenderLoop(id);
+          pendingSourceModels.delete(id);
+          pendingSourceNames.delete(id);
+          pendingSourceLabels.delete(id);
+          latestSourceStatus.delete(id);
+          const tile = document.getElementById(`tile-${id}`);
+          if (tile) tile.remove();
+          if (zoomSourceId === id) toggleZoom('');
+        }
+      });
+    }
+
+    async function addSource() {
+      const source = document.getElementById('newSource').value.trim();
+      const name = document.getElementById('newName').value.trim();
+      const labels = document.getElementById('newLabels').value.trim();
+      if (!source) return showToast(t('err_need_source'), 'error');
+      await fetchJson('/api/sources', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ source, name, labels })
+      });
+      document.getElementById('newSource').value = '';
+      document.getElementById('newName').value = '';
+      document.getElementById('newLabels').value = '';
+      await refreshStatus();
+      showToast(t('toast_source_added'));
+    }
+
+    async function saveSourceConfig(sourceId) {
+      const name = document.getElementById(`name-${sourceId}`).value.trim();
+      const labels = document.getElementById(`labels-${sourceId}`).value.trim();
+      const model = document.getElementById(`model-${sourceId}`).value;
+      await fetchJson(`/api/sources/${sourceId}`, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name, labels, model })
+      });
+      pendingSourceModels.delete(sourceId);
+      pendingSourceNames.delete(sourceId);
+      pendingSourceLabels.delete(sourceId);
+      await refreshStatus();
+      showToast(t('toast_source_saved'));
+    }
+
+    async function cloneSource(sourceId) {
+      const src = latestSourceStatus.get(sourceId);
+      if (!src) return showToast(t('err_source_read_failed'), 'error');
+      const cloneName = `${src.name || sourceId}_copy`;
+      const labels = src.labels_text || '';
+      const model = pendingSourceModels.get(sourceId) || src.model || document.getElementById('modelSelect').value;
+      try {
+        const r = await fetchJson('/api/sources', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ source: src.source, name: cloneName, labels })
+        });
+        if (r.source_id && model) {
+          await fetchJson(`/api/sources/${r.source_id}`, {
+            method:'PUT',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ model })
+          });
+        }
+        await refreshStatus();
+        showToast(t('toast_source_cloned'));
+      } catch (e) {
+        showToast(t('toast_clone_failed', { msg: e.message }), 'error');
+      }
+    }
+
+    async function removeSource(sourceId) {
+      if(!confirm(t('confirm_delete_source'))) return;
+      await fetchJson(`/api/sources/${sourceId}`, { method:'DELETE' });
+      await refreshStatus();
+      showToast(t('toast_source_deleted'));
+    }
+
+    async function uploadModel() {
+      const f = document.getElementById('modelFile').files[0];
+      if (!f) return showToast(t('err_choose_pt'), 'error');
+      const fd = new FormData();
+      fd.append('file', f);
+      await fetchJson('/api/models/upload', { method:'POST', body:fd });
+      await refreshModels();
+      showToast(t('toast_upload_done'));
+    }
+
+    async function activateModel() {
+      const name = document.getElementById('modelSelect').value;
+      if (!name) return showToast(t('err_no_model'), 'error');
+      await fetchJson('/api/models/activate', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name })
+      });
+      pendingGlobalModel = '';
+      await refreshStatus();
+      showToast(t('toast_model_switched'));
+    }
+
+    async function init() {
+      applyLanguage();
+      await refreshModels();
+      await refreshMqtt();
+      await refreshStatus();
+      setInterval(refreshStatus, 2500);
+    }
+
+    init().catch(e => {
+      document.getElementById('status').innerHTML = `<span class="text-red-400">${t('status_init_failed', { msg: e.message })}</span>`;
+    });
+  </script>
+</body>
+</html>
