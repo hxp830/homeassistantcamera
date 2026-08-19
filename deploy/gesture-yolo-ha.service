@@ -1,0 +1,26 @@
+; Example systemd unit. Copy to /etc/systemd/system/gesture-yolo-ha.service,
+; adjust User/paths, then: systemctl daemon-reload && systemctl enable --now gesture-yolo-ha
+
+[Unit]
+Description=Gesture YOLO HA
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=linaro
+WorkingDirectory=/home/linaro/gesture-yolo-ha
+EnvironmentFile=/home/linaro/gesture-yolo-ha/.env
+ExecStart=/home/linaro/gesture-yolo-ha/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+; The service only needs its own directory and the video devices.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/linaro/gesture-yolo-ha
+
+[Install]
+WantedBy=multi-user.target

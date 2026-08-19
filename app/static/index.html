@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>YOLO 多路手势识别管理</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Served locally so the console keeps working on an isolated LAN. -->
+  <script src="/static/vendor/tailwind.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
-      background: #0f172a; /* Slate 900 */
-      color: #e2e8f0; /* Slate 200 */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
       margin: 0;
     }
     .glass-card {
-      background: rgba(30, 41, 59, 0.7); /* Slate 800 with opacity */
+      background: rgba(30, 41, 59, 0.7);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -29,7 +29,7 @@
     }
     input:focus, select:focus {
       outline: none;
-      border-color: #38bdf8; /* Sky 400 */
+      border-color: #38bdf8;
       box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
     }
     .btn-primary {
@@ -42,25 +42,13 @@
       box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
       transform: translateY(-1px);
     }
-    .btn-danger {
-      background: linear-gradient(135deg, #dc2626, #991b1b);
-      color: white;
-      transition: all 0.3s ease;
-    }
-    .btn-danger:hover {
-      background: linear-gradient(135deg, #b91c1c, #7f1d1d);
-      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
-      transform: translateY(-1px);
-    }
     .btn-secondary {
       background: rgba(71, 85, 105, 0.5);
       color: #e2e8f0;
       border: 1px solid rgba(255,255,255,0.1);
       transition: all 0.3s ease;
     }
-    .btn-secondary:hover {
-      background: rgba(71, 85, 105, 0.8);
-    }
+    .btn-secondary:hover { background: rgba(71, 85, 105, 0.8); }
     .btn-icon {
       background: rgba(15, 23, 42, 0.6);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -78,17 +66,17 @@
       overflow: hidden;
       background: #000;
       border: 1px solid rgba(255,255,255,0.05);
+      aspect-ratio: 16 / 9;
     }
-    .canvas-container canvas {
+    .canvas-container img {
       width: 100%;
-      height: auto;
+      height: 100%;
+      object-fit: contain;
       display: block;
       cursor: zoom-in;
       transition: opacity 0.3s;
     }
-    .canvas-container:hover canvas {
-      opacity: 0.9;
-    }
+    .canvas-container:hover img { opacity: 0.9; }
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -100,18 +88,11 @@
       color: #34d399;
       border: 1px solid rgba(52, 211, 153, 0.2);
     }
-    /* Modal styles */
-    .modal-overlay {
-      background: rgba(2, 6, 23, 0.85);
-      backdrop-filter: blur(8px);
-    }
-    /* Scrollbar */
+    .modal-overlay { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(8px); }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    
-    /* Toast notifications */
     #toast-container {
       position: fixed;
       bottom: 20px;
@@ -135,17 +116,27 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      max-width: 420px;
     }
-    .toast.show {
-      transform: translateX(0);
-    }
+    .toast.show { transform: translateX(0); }
+    .dot-online { background: #34d399; }
+    .dot-offline { background: #f87171; }
   </style>
 </head>
 <body class="min-h-screen pb-12">
-  
+
   <div id="toast-container"></div>
-  
-  <!-- Header -->
+
+  <!-- Token gate, only shown when the server requires API_TOKEN -->
+  <div id="authModal" class="fixed inset-0 modal-overlay z-[100] hidden items-center justify-center p-4">
+    <div class="glass-card p-6 w-full max-w-sm space-y-4">
+      <h2 class="text-lg font-semibold text-white" data-i18n="auth_title">需要访问令牌</h2>
+      <p class="text-sm text-slate-400" data-i18n="auth_hint">该实例启用了 API_TOKEN，请输入令牌以继续。</p>
+      <input id="authToken" type="password" class="w-full px-4 py-2.5 rounded-lg text-sm" data-i18n-placeholder="auth_placeholder" placeholder="API Token" />
+      <button onclick="submitToken()" class="btn-primary w-full px-4 py-2.5 rounded-lg text-sm font-medium" data-i18n="auth_submit">登录</button>
+    </div>
+  </div>
+
   <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -166,11 +157,8 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-6">
-    
-    <!-- Top Row: Config & Models -->
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      
-      <!-- Video Source Adding -->
       <div class="glass-card p-6">
         <div class="flex items-center gap-2 mb-4">
           <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
@@ -191,7 +179,6 @@
         </div>
       </div>
 
-      <!-- Model Management -->
       <div class="glass-card p-6">
         <div class="flex items-center gap-2 mb-4">
           <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
@@ -203,19 +190,19 @@
             <button onclick="uploadModel()" class="btn-secondary px-6 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap" data-i18n="btn_upload">上传</button>
           </div>
           <div class="flex items-center gap-4">
-            <select id="modelSelect" onchange="onGlobalModelChange(this.value)" class="flex-1 px-4 py-2.5 rounded-lg text-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:0.65rem_auto] pr-10"></select>
+            <select id="modelSelect" onchange="onGlobalModelChange(this.value)" class="flex-1 px-4 py-2.5 rounded-lg text-sm"></select>
             <button onclick="activateModel()" class="btn-primary px-6 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap" data-i18n="btn_apply_global_model">应用全局模型</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- MQTT Settings (Collapsible) -->
     <details class="glass-card group" open>
       <summary class="p-6 cursor-pointer flex items-center justify-between list-none">
         <div class="flex items-center gap-2">
           <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path></svg>
           <h2 class="text-lg font-semibold text-white" data-i18n="section_mqtt">MQTT 桥接设置</h2>
+          <span id="mqttState" class="ml-2 text-xs px-2 py-0.5 rounded-full border border-slate-600 text-slate-400"></span>
         </div>
         <svg class="w-5 h-5 text-slate-400 group-open:-rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
       </summary>
@@ -259,36 +246,37 @@
       </div>
     </details>
 
-    <!-- Multi-View Grid -->
     <div>
       <div class="flex items-center gap-2 mb-6 ml-2">
         <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
         <h2 class="text-xl font-bold text-white tracking-wide" data-i18n="section_live_matrix">实时监控矩阵</h2>
       </div>
-      <div id="sourceGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        <!-- JS generated tiles -->
-      </div>
+      <div id="sourceGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
     </div>
 
   </main>
 
-  <!-- Zoom Modal -->
-  <div id="zoomModal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4 transition-opacity" onclick="toggleZoom('')">
+  <div id="zoomModal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4 transition-opacity" onclick="closeZoom()">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden" onclick="event.stopPropagation()">
       <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80">
         <h3 id="zoomTitle" class="text-lg font-semibold text-white" data-i18n="zoom_title">视频放大</h3>
-        <button class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800" onclick="toggleZoom('')">
+        <button class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800" onclick="closeZoom()">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
       <div class="p-4 bg-black">
-        <canvas id="zoomCanvas" class="w-full h-auto rounded-lg"></canvas>
+        <!-- The zoom view uses the MJPEG stream: one connection, full frame rate. -->
+        <img id="zoomImage" class="w-full h-auto rounded-lg" alt="" />
       </div>
     </div>
   </div>
 
   <script>
-    const renderLoops = new Map();
+    const GRID_POLL_MS = 120;
+    const STATUS_POLL_MS = 2500;
+
+    const tilePollers = new Map();
+    const visibleTiles = new Set();
     let availableModels = [];
     let pendingGlobalModel = '';
     const pendingSourceModels = new Map();
@@ -296,7 +284,8 @@
     const pendingSourceLabels = new Map();
     const latestSourceStatus = new Map();
     let zoomSourceId = '';
-    let zoomRunning = false;
+    let statusTimer = null;
+
     const LANG_KEY = 'gesture_ui_lang';
     const SUPPORTED_LANGS = ['zh', 'en', 'ru'];
     let currentLang = (localStorage.getItem(LANG_KEY) || 'zh').toLowerCase();
@@ -356,7 +345,16 @@
         toast_upload_done: '模型上传完成',
         err_no_model: '没有可选模型',
         toast_model_switched: '已切换全局模型',
-        status_init_failed: '初始化失败: {msg}'
+        status_init_failed: '初始化失败: {msg}',
+        mqtt_online: 'MQTT 已连接',
+        mqtt_offline: 'MQTT 未连接',
+        cam_online: '在线',
+        cam_offline: '离线',
+        auth_title: '需要访问令牌',
+        auth_hint: '该实例启用了 API_TOKEN，请输入令牌以继续。',
+        auth_placeholder: 'API Token',
+        auth_submit: '登录',
+        auth_failed: '令牌无效'
       },
       en: {
         page_title: 'YOLO Multi-Source Gesture Recognition',
@@ -411,7 +409,16 @@
         toast_upload_done: 'Model upload completed',
         err_no_model: 'No model available',
         toast_model_switched: 'Global model switched',
-        status_init_failed: 'Initialization failed: {msg}'
+        status_init_failed: 'Initialization failed: {msg}',
+        mqtt_online: 'MQTT connected',
+        mqtt_offline: 'MQTT disconnected',
+        cam_online: 'online',
+        cam_offline: 'offline',
+        auth_title: 'Access token required',
+        auth_hint: 'This instance has API_TOKEN enabled. Enter the token to continue.',
+        auth_placeholder: 'API Token',
+        auth_submit: 'Sign in',
+        auth_failed: 'Invalid token'
       },
       ru: {
         page_title: 'YOLO Многопоточное распознавание жестов',
@@ -466,22 +473,34 @@
         toast_upload_done: 'Загрузка модели завершена',
         err_no_model: 'Нет доступной модели',
         toast_model_switched: 'Глобальная модель переключена',
-        status_init_failed: 'Ошибка инициализации: {msg}'
+        status_init_failed: 'Ошибка инициализации: {msg}',
+        mqtt_online: 'MQTT подключен',
+        mqtt_offline: 'MQTT отключен',
+        cam_online: 'онлайн',
+        cam_offline: 'офлайн',
+        auth_title: 'Требуется токен доступа',
+        auth_hint: 'На этом сервере включен API_TOKEN. Введите токен.',
+        auth_placeholder: 'API Token',
+        auth_submit: 'Войти',
+        auth_failed: 'Неверный токен'
       }
     };
-    const modelNameMap = {
-      mediapipe_hands: () => t('model_mediapipe')
-    };
+
+    const modelNameMap = { mediapipe_hands: () => t('model_mediapipe') };
 
     function t(key, vars) {
       const langPack = I18N[currentLang] || I18N.zh;
       let text = langPack[key] || I18N.zh[key] || key;
       if (vars && typeof vars === 'object') {
-        Object.keys(vars).forEach(k => {
-          text = text.replaceAll(`{${k}}`, String(vars[k]));
-        });
+        Object.keys(vars).forEach(k => { text = text.replaceAll(`{${k}}`, String(vars[k])); });
       }
       return text;
+    }
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+      ));
     }
 
     function applyLanguage() {
@@ -489,18 +508,14 @@
       document.title = t('page_title');
       const langEl = document.getElementById('langSwitch');
       if (langEl) langEl.value = currentLang;
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        el.textContent = t(el.dataset.i18n);
-      });
-      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        el.placeholder = t(el.dataset.i18nPlaceholder);
-      });
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
       document.querySelectorAll('[id^="name-"]').forEach(el => { el.placeholder = t('placeholder_custom_name'); });
       document.querySelectorAll('[id^="labels-"]').forEach(el => { el.placeholder = t('placeholder_push_labels'); });
-      document.querySelectorAll('button[onclick^="saveSourceConfig("]').forEach(el => { el.textContent = t('btn_save'); });
-      document.querySelectorAll('button[onclick^="cloneSource("]').forEach(el => { el.title = t('title_clone_card'); });
-      document.querySelectorAll('button[onclick^="removeSource("]').forEach(el => { el.title = t('title_delete'); });
-      document.querySelectorAll('button[onclick^="copyToClipboard("]').forEach(el => { el.title = t('title_copy_mqtt'); });
+      document.querySelectorAll('button[data-role="save-source"]').forEach(el => { el.textContent = t('btn_save'); });
+      document.querySelectorAll('button[data-role="clone-source"]').forEach(el => { el.title = t('title_clone_card'); });
+      document.querySelectorAll('button[data-role="delete-source"]').forEach(el => { el.title = t('title_delete'); });
+      document.querySelectorAll('button[data-role="copy-topic"]').forEach(el => { el.title = t('title_copy_mqtt'); });
     }
 
     function setLanguage(lang) {
@@ -518,80 +533,30 @@
       return typeof handler === 'function' ? handler() : (handler || name);
     }
 
-    function renderSourceModelOptions(sourceId, selectedModel) {
-      const sel = document.getElementById(`model-${sourceId}`);
-      if (!sel) return;
-      const isFocused = document.activeElement === sel;
-      const current = sel.value || '';
-      const next = selectedModel || current || '';
-      const oldValues = Array.from(sel.options).map(o => o.value);
-      const listChanged = oldValues.length !== availableModels.length || oldValues.some((v, i) => v !== availableModels[i]);
-      if (listChanged) {
-        sel.innerHTML = '';
-        availableModels.forEach(m => {
-          const o = document.createElement('option');
-          o.value = m;
-          o.textContent = getModelDisplayName(m);
-          sel.appendChild(o);
-        });
-      }
-      const finalValue = isFocused ? current : next;
-      if (finalValue && availableModels.includes(finalValue)) {
-        sel.value = finalValue;
-      }
-    }
-
-    function onSourceModelChange(sourceId, value) {
-      pendingSourceModels.set(sourceId, value);
-    }
-
-    function onSourceNameInput(sourceId, value) {
-      pendingSourceNames.set(sourceId, value);
-    }
-
-    function onSourceLabelsInput(sourceId, value) {
-      pendingSourceLabels.set(sourceId, value);
-    }
-
-    function onGlobalModelChange(value) {
-      pendingGlobalModel = value || '';
-    }
-    
-    // Toast notification system
     function showToast(message, type = 'success') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
       toast.className = 'toast';
-      
-      let icon = '';
-      if (type === 'success') {
-        icon = `<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
-      } else {
-        icon = `<svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
-      }
-      
-      toast.innerHTML = `${icon} <span class="text-sm font-medium">${message}</span>`;
+      const color = type === 'success' ? 'text-emerald-400' : 'text-red-400';
+      const path = type === 'success'
+        ? 'M5 13l4 4L19 7'
+        : 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+      toast.innerHTML = `<svg class="w-5 h-5 ${color}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${path}"></path></svg><span class="text-sm font-medium"></span>`;
+      toast.querySelector('span').textContent = message;
       container.appendChild(toast);
-      
-      // Trigger reflow to apply animation
-      setTimeout(() => {
-        toast.classList.add('show');
-      }, 10);
-      
+      setTimeout(() => toast.classList.add('show'), 10);
       setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
       }, 3000);
     }
-    
-    // Copy to clipboard function
+
     async function copyToClipboard(text) {
       try {
         await navigator.clipboard.writeText(text);
         showToast(t('toast_copy_ok'));
       } catch (err) {
-        // Fallback for older browsers
-        const textArea = document.createElement("textarea");
+        const textArea = document.createElement('textarea');
         textArea.value = text;
         document.body.appendChild(textArea);
         textArea.select();
@@ -613,12 +578,18 @@
       return text || 'Unknown error';
     }
 
+    class AuthError extends Error {}
+
     async function fetchJson(url, opt, timeoutMs = 10000) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const r = await fetch(url, { ...(opt || {}), signal: controller.signal });
         const text = await r.text();
+        if (r.status === 401) {
+          openAuthGate();
+          throw new AuthError('unauthorized');
+        }
         if (!r.ok) throw new Error(parseErrorText(text));
         return text ? JSON.parse(text) : {};
       } catch (e) {
@@ -626,6 +597,32 @@
         throw e;
       } finally {
         clearTimeout(timer);
+      }
+    }
+
+    function openAuthGate() {
+      const modal = document.getElementById('authModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.getElementById('authToken').focus();
+    }
+
+    async function submitToken() {
+      const token = document.getElementById('authToken').value;
+      try {
+        const r = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        if (!r.ok) return showToast(t('auth_failed'), 'error');
+        const modal = document.getElementById('authModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.getElementById('authToken').value = '';
+        await init();
+      } catch (e) {
+        showToast(t('auth_failed'), 'error');
       }
     }
 
@@ -641,28 +638,53 @@
         o.textContent = getModelDisplayName(m);
         sel.appendChild(o);
       });
-      if (oldGlobal && availableModels.includes(oldGlobal)) {
-        sel.value = oldGlobal;
-      }
+      if (oldGlobal && availableModels.includes(oldGlobal)) sel.value = oldGlobal;
       document.querySelectorAll('[id^="model-"]').forEach(el => {
         const sourceId = el.id.replace('model-', '');
         renderSourceModelOptions(sourceId, pendingSourceModels.get(sourceId) || el.value);
       });
     }
 
+    function renderSourceModelOptions(sourceId, selectedModel) {
+      const sel = document.getElementById(`model-${sourceId}`);
+      if (!sel) return;
+      const isFocused = document.activeElement === sel;
+      const current = sel.value || '';
+      const next = selectedModel || current || '';
+      const oldValues = Array.from(sel.options).map(o => o.value);
+      const listChanged = oldValues.length !== availableModels.length || oldValues.some((v, i) => v !== availableModels[i]);
+      if (listChanged) {
+        sel.innerHTML = '';
+        availableModels.forEach(m => {
+          const o = document.createElement('option');
+          o.value = m;
+          o.textContent = getModelDisplayName(m);
+          sel.appendChild(o);
+        });
+      }
+      const finalValue = isFocused ? current : next;
+      if (finalValue && availableModels.includes(finalValue)) sel.value = finalValue;
+    }
+
+    function onSourceModelChange(sourceId, value) { pendingSourceModels.set(sourceId, value); }
+    function onSourceNameInput(sourceId, value) { pendingSourceNames.set(sourceId, value); }
+    function onSourceLabelsInput(sourceId, value) { pendingSourceLabels.set(sourceId, value); }
+    function onGlobalModelChange(value) { pendingGlobalModel = value || ''; }
+
     async function refreshMqtt() {
       const m = await fetchJson('/api/mqtt');
       document.getElementById('mqttHost').value = m.host || '';
       document.getElementById('mqttPort').value = m.port || 1883;
       document.getElementById('mqttUser').value = m.user || '';
+      // The server never returns the real password, only a mask that means "unchanged".
       document.getElementById('mqttPassword').value = m.password || '';
       document.getElementById('mqttClientId').value = m.client_id || '';
       document.getElementById('mqttDiscovery').value = m.discovery_prefix || '';
       document.getElementById('mqttStateTopic').value = m.state_topic || '';
     }
 
-    async function saveMqtt() {
-      const payload = {
+    function mqttPayload() {
+      return {
         host: document.getElementById('mqttHost').value.trim(),
         port: Number(document.getElementById('mqttPort').value || 1883),
         user: document.getElementById('mqttUser').value,
@@ -671,178 +693,194 @@
         discovery_prefix: document.getElementById('mqttDiscovery').value.trim(),
         state_topic: document.getElementById('mqttStateTopic').value.trim()
       };
+    }
+
+    async function saveMqtt() {
       try {
         await fetchJson('/api/mqtt', {
-          method:'PUT',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mqttPayload())
         }, 12000);
         showToast(t('toast_mqtt_saved'));
+        await refreshMqtt();
       } catch (e) {
-        showToast(t('toast_save_failed', { msg: e.message }), 'error');
+        if (!(e instanceof AuthError)) showToast(t('toast_save_failed', { msg: e.message }), 'error');
       }
     }
 
     async function testMqtt() {
-      const payload = {
-        host: document.getElementById('mqttHost').value.trim(),
-        port: Number(document.getElementById('mqttPort').value || 1883),
-        user: document.getElementById('mqttUser').value,
-        password: document.getElementById('mqttPassword').value,
-        client_id: document.getElementById('mqttClientId').value.trim(),
-        discovery_prefix: document.getElementById('mqttDiscovery').value.trim(),
-        state_topic: document.getElementById('mqttStateTopic').value.trim()
-      };
       try {
         const r = await fetchJson('/api/mqtt/test', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
-        }, 8000);
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mqttPayload())
+        }, 12000);
         showToast(r.message || t('toast_mqtt_test_ok'));
       } catch (e) {
-        showToast(t('toast_mqtt_test_fail', { msg: e.message }), 'error');
+        if (!(e instanceof AuthError)) showToast(t('toast_mqtt_test_fail', { msg: e.message }), 'error');
       }
     }
+
+    const tileObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        const sourceId = entry.target.dataset.sourceId;
+        if (!sourceId) return;
+        if (entry.isIntersecting) visibleTiles.add(sourceId);
+        else visibleTiles.delete(sourceId);
+      });
+    }, { rootMargin: '100px' });
 
     function ensureTile(source) {
       const grid = document.getElementById('sourceGrid');
       let tile = document.getElementById(`tile-${source.source_id}`);
       if (tile) return tile;
 
+      const sid = esc(source.source_id);
       tile = document.createElement('div');
       tile.className = 'glass-card flex flex-col overflow-hidden';
       tile.id = `tile-${source.source_id}`;
+      tile.dataset.sourceId = source.source_id;
       tile.innerHTML = `
         <div class="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/30">
-          <strong id="title-${source.source_id}" class="text-white font-semibold truncate pr-2">${source.name || source.source_id}</strong>
+          <div class="flex items-center gap-2 min-w-0">
+            <span id="dot-${sid}" class="w-2 h-2 rounded-full dot-offline flex-shrink-0"></span>
+            <strong id="title-${sid}" class="text-white font-semibold truncate"></strong>
+          </div>
           <div class="flex items-center gap-1">
-            <button onclick="cloneSource('${source.source_id}')" class="text-slate-400 hover:text-sky-400 transition-colors p-1" title="${t('title_clone_card')}">
+            <button data-role="clone-source" class="text-slate-400 hover:text-sky-400 transition-colors p-1" title="${esc(t('title_clone_card'))}">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2M8 16h8a2 2 0 002-2V8M8 16a2 2 0 002 2h8a2 2 0 002-2v-4a2 2 0 00-2-2h-2"></path></svg>
             </button>
-            <button onclick="removeSource('${source.source_id}')" class="text-slate-400 hover:text-red-400 transition-colors p-1" title="${t('title_delete')}">
+            <button data-role="delete-source" class="text-slate-400 hover:text-red-400 transition-colors p-1" title="${esc(t('title_delete'))}">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
           </div>
         </div>
-        
+
         <div class="p-4 flex-1 flex flex-col gap-3">
           <div class="canvas-container shadow-inner">
-            <canvas id="canvas-${source.source_id}" onclick="toggleZoom('${source.source_id}', document.getElementById('title-${source.source_id}').textContent)"></canvas>
-            
+            <img id="cam-${sid}" alt="" />
             <div class="absolute bottom-2 left-2 right-2 flex justify-between items-end pointer-events-none">
-              <div id="detect-${source.source_id}" class="bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs font-mono text-emerald-400 border border-emerald-500/20"></div>
+              <div id="detect-${sid}" class="bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs font-mono text-emerald-400 border border-emerald-500/20"></div>
+              <div id="fps-${sid}" class="bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-mono text-slate-300"></div>
             </div>
           </div>
-          
+
           <div class="space-y-2 mt-2">
-            <input id="name-${source.source_id}" oninput="onSourceNameInput('${source.source_id}', this.value)" class="w-full px-3 py-1.5 rounded-md text-xs" placeholder="${t('placeholder_custom_name')}" />
-            <input id="labels-${source.source_id}" oninput="onSourceLabelsInput('${source.source_id}', this.value)" class="w-full px-3 py-1.5 rounded-md text-xs" placeholder="${t('placeholder_push_labels')}" />
-            <select id="model-${source.source_id}" onchange="onSourceModelChange('${source.source_id}', this.value)" class="w-full px-3 py-1.5 rounded-md text-xs"></select>
+            <input id="name-${sid}" class="w-full px-3 py-1.5 rounded-md text-xs" placeholder="${esc(t('placeholder_custom_name'))}" />
+            <input id="labels-${sid}" class="w-full px-3 py-1.5 rounded-md text-xs" placeholder="${esc(t('placeholder_push_labels'))}" />
+            <select id="model-${sid}" class="w-full px-3 py-1.5 rounded-md text-xs"></select>
             <div class="flex items-center justify-between pt-1 gap-2">
               <div class="flex-1 min-w-0 flex items-center bg-slate-800/50 rounded-md px-2 py-1 border border-slate-700">
-                <div class="text-[10px] text-slate-400 truncate select-all" id="topic-${source.source_id}" title="MQTT Topic"></div>
+                <div class="text-[10px] text-slate-400 truncate select-all" id="topic-${sid}" title="MQTT Topic"></div>
               </div>
-              <button onclick="copyToClipboard(document.getElementById('topic-${source.source_id}').innerText)" class="btn-icon p-1.5 rounded-md flex-shrink-0" title="${t('title_copy_mqtt')}">
+              <button data-role="copy-topic" class="btn-icon p-1.5 rounded-md flex-shrink-0" title="${esc(t('title_copy_mqtt'))}">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
               </button>
-              <button onclick="saveSourceConfig('${source.source_id}')" class="text-xs btn-primary px-3 py-1.5 rounded-md shadow-sm ml-1">${t('btn_save')}</button>
+              <button data-role="save-source" class="text-xs btn-primary px-3 py-1.5 rounded-md shadow-sm ml-1">${esc(t('btn_save'))}</button>
             </div>
           </div>
         </div>
       `;
       grid.appendChild(tile);
-      renderSourceModelOptions(source.source_id, source.model || '');
-      startRenderLoop(source.source_id);
+
+      const id = source.source_id;
+      tile.querySelector('[data-role="clone-source"]').onclick = () => cloneSource(id);
+      tile.querySelector('[data-role="delete-source"]').onclick = () => removeSource(id);
+      tile.querySelector('[data-role="save-source"]').onclick = () => saveSourceConfig(id);
+      tile.querySelector('[data-role="copy-topic"]').onclick = () =>
+        copyToClipboard(document.getElementById(`topic-${id}`).textContent);
+      tile.querySelector(`#name-${CSS.escape(id)}`).oninput = (e) => onSourceNameInput(id, e.target.value);
+      tile.querySelector(`#labels-${CSS.escape(id)}`).oninput = (e) => onSourceLabelsInput(id, e.target.value);
+      tile.querySelector(`#model-${CSS.escape(id)}`).onchange = (e) => onSourceModelChange(id, e.target.value);
+      tile.querySelector(`#cam-${CSS.escape(id)}`).onclick = () => openZoom(id);
+
+      tileObserver.observe(tile);
+      visibleTiles.add(id);
+      renderSourceModelOptions(id, source.model || '');
+      startTilePoller(id);
       return tile;
     }
 
-    function startRenderLoop(sourceId) {
-      if (renderLoops.has(sourceId)) return;
+    /* Grid tiles poll snapshots instead of holding an MJPEG connection each: browsers
+       cap concurrent connections per host at ~6, which multi-camera grids would exhaust. */
+    function startTilePoller(sourceId) {
+      if (tilePollers.has(sourceId)) return;
       let running = true;
-      renderLoops.set(sourceId, () => { running = false; });
-
-      const canvas = document.getElementById(`canvas-${sourceId}`);
-      const ctx = canvas.getContext('2d');
+      tilePollers.set(sourceId, () => { running = false; });
+      const img = document.getElementById(`cam-${sourceId}`);
 
       async function tick() {
         if (!running) return;
+        if (document.hidden || !visibleTiles.has(sourceId)) {
+          setTimeout(tick, 500);
+          return;
+        }
         try {
-          const r = await fetch(`/snapshot/${sourceId}.jpg?t=${Date.now()}`, { cache:'no-store' });
+          const r = await fetch(`/snapshot/${encodeURIComponent(sourceId)}.jpg?t=${Date.now()}`, { cache: 'no-store' });
           if (r.ok) {
             const blob = await r.blob();
-            const bmp = await createImageBitmap(blob);
-            if (!canvas.width || !canvas.height) {
-              canvas.width = bmp.width;
-              canvas.height = bmp.height;
-            }
-            ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-            bmp.close();
+            const url = URL.createObjectURL(blob);
+            const previous = img.dataset.objectUrl;
+            img.src = url;
+            if (previous) URL.revokeObjectURL(previous);
+            img.dataset.objectUrl = url;
           }
         } catch (_) {}
-        setTimeout(tick, 120);
+        setTimeout(tick, GRID_POLL_MS);
       }
       tick();
     }
 
-    function stopRenderLoop(sourceId) {
-      const stop = renderLoops.get(sourceId);
+    function stopTilePoller(sourceId) {
+      const stop = tilePollers.get(sourceId);
       if (stop) stop();
-      renderLoops.delete(sourceId);
+      tilePollers.delete(sourceId);
+      const img = document.getElementById(`cam-${sourceId}`);
+      if (img && img.dataset.objectUrl) URL.revokeObjectURL(img.dataset.objectUrl);
     }
 
-    function toggleZoom(sourceId, sourceName) {
+    function openZoom(sourceId) {
+      if (!sourceId) return;
       const modal = document.getElementById('zoomModal');
-      if (!sourceId || sourceId === zoomSourceId) {
-        zoomSourceId = '';
-        zoomRunning = false;
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        return;
-      }
       zoomSourceId = sourceId;
-      zoomRunning = true;
       modal.classList.remove('hidden');
       modal.classList.add('flex');
-      
-      const displayName = sourceName || (document.getElementById(`title-${sourceId}`) ? document.getElementById(`title-${sourceId}`).textContent : sourceId);
-      document.getElementById('zoomTitle').textContent = t('zoom_preview', { name: displayName });
-      
-      startZoomLoop();
+      const titleEl = document.getElementById(`title-${sourceId}`);
+      document.getElementById('zoomTitle').textContent =
+        t('zoom_preview', { name: titleEl ? titleEl.textContent : sourceId });
+      document.getElementById('zoomImage').src = `/stream/${encodeURIComponent(sourceId)}.mjpg?t=${Date.now()}`;
     }
 
-    async function startZoomLoop() {
-      const canvas = document.getElementById('zoomCanvas');
-      const ctx = canvas.getContext('2d');
-      while (zoomRunning && zoomSourceId) {
-        try {
-          const r = await fetch(`/snapshot/${zoomSourceId}.jpg?t=${Date.now()}`, { cache:'no-store' });
-          if (r.ok) {
-            const blob = await r.blob();
-            const bmp = await createImageBitmap(blob);
-            if (!canvas.width || !canvas.height) {
-              canvas.width = bmp.width;
-              canvas.height = bmp.height;
-            }
-            ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-            bmp.close();
-          }
-        } catch (_) {}
-        await new Promise(res => setTimeout(res, 80));
-      }
+    function closeZoom() {
+      const modal = document.getElementById('zoomModal');
+      zoomSourceId = '';
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      // Clearing src is what actually terminates the MJPEG connection.
+      document.getElementById('zoomImage').removeAttribute('src');
     }
 
     async function refreshStatus() {
       const s = await fetchJson('/api/status');
-      document.getElementById('status').innerHTML = `
-        <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
-        ${t('status_current_model')}: <strong class="ml-1 mr-3 text-white">${getModelDisplayName(s.model)}</strong> 
-        ${t('status_devices_online')}: <strong class="ml-1 text-white">${s.sources.length}</strong>
-      `;
+      const statusEl = document.getElementById('status');
+      statusEl.innerHTML = '';
+      const dot = document.createElement('span');
+      dot.className = 'w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse';
+      statusEl.appendChild(dot);
+      statusEl.appendChild(document.createTextNode(
+        `${t('status_current_model')}: ${getModelDisplayName(s.model)} · ${t('status_devices_online')}: ${s.sources.length}`
+      ));
+
+      const mqttState = document.getElementById('mqttState');
+      mqttState.textContent = s.mqtt_connected ? t('mqtt_online') : t('mqtt_offline');
+      mqttState.className = s.mqtt_connected
+        ? 'ml-2 text-xs px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-400'
+        : 'ml-2 text-xs px-2 py-0.5 rounded-full border border-red-500/40 text-red-400';
+
       const globalSel = document.getElementById('modelSelect');
-      const isGlobalFocused = document.activeElement === globalSel;
       const globalTarget = pendingGlobalModel || s.model;
-      if (!isGlobalFocused && globalTarget && availableModels.includes(globalTarget)) {
+      if (document.activeElement !== globalSel && globalTarget && availableModels.includes(globalTarget)) {
         globalSel.value = globalTarget;
       }
 
@@ -851,36 +889,44 @@
         latestSourceStatus.set(src.source_id, src);
         alive.add(src.source_id);
         ensureTile(src);
+
         document.getElementById(`title-${src.source_id}`).textContent = src.name || src.source_id;
+        document.getElementById(`dot-${src.source_id}`).className =
+          `w-2 h-2 rounded-full flex-shrink-0 ${src.connected ? 'dot-online' : 'dot-offline'}`;
+        document.getElementById(`fps-${src.source_id}`).textContent =
+          src.connected ? `${src.fps ?? 0} fps` : t('cam_offline');
+
         const pendingName = pendingSourceNames.get(src.source_id);
         const pendingLabels = pendingSourceLabels.get(src.source_id);
-        document.getElementById(`name-${src.source_id}`).value = pendingName !== undefined ? pendingName : (src.name || src.source_id);
-        document.getElementById(`labels-${src.source_id}`).value = pendingLabels !== undefined ? pendingLabels : (src.labels_text || '');
-        const pendingModel = pendingSourceModels.get(src.source_id);
-        renderSourceModelOptions(src.source_id, pendingModel || src.model || s.model || '');
-        
+        document.getElementById(`name-${src.source_id}`).value =
+          pendingName !== undefined ? pendingName : (src.name || src.source_id);
+        document.getElementById(`labels-${src.source_id}`).value =
+          pendingLabels !== undefined ? pendingLabels : (src.labels_text || '');
+        renderSourceModelOptions(src.source_id, pendingSourceModels.get(src.source_id) || src.model || s.model || '');
+
         const base = (document.getElementById('mqttStateTopic').value || 'gesture_yolo_ha/state').trim();
         document.getElementById(`topic-${src.source_id}`).textContent = `${base}/${src.source_id}`;
-        
+
         const detectEl = document.getElementById(`detect-${src.source_id}`);
-        if(src.latest.gesture && src.latest.gesture !== 'none') {
-            detectEl.innerHTML = `<span class="text-white">${src.latest.gesture}</span> <span class="text-emerald-500/70 ml-1">${(src.latest.confidence * 100).toFixed(0)}%</span>`;
-            detectEl.style.display = 'block';
+        if (src.latest && src.latest.gesture && src.latest.gesture !== 'none') {
+          detectEl.textContent = `${src.latest.gesture} ${(src.latest.confidence * 100).toFixed(0)}%`;
+          detectEl.style.display = 'block';
         } else {
-            detectEl.style.display = 'none';
+          detectEl.style.display = 'none';
         }
       });
 
-      [...renderLoops.keys()].forEach(id => {
+      [...tilePollers.keys()].forEach(id => {
         if (!alive.has(id)) {
-          stopRenderLoop(id);
+          stopTilePoller(id);
           pendingSourceModels.delete(id);
           pendingSourceNames.delete(id);
           pendingSourceLabels.delete(id);
           latestSourceStatus.delete(id);
+          visibleTiles.delete(id);
           const tile = document.getElementById(`tile-${id}`);
-          if (tile) tile.remove();
-          if (zoomSourceId === id) toggleZoom('');
+          if (tile) { tileObserver.unobserve(tile); tile.remove(); }
+          if (zoomSourceId === id) closeZoom();
         }
       });
     }
@@ -890,65 +936,74 @@
       const name = document.getElementById('newName').value.trim();
       const labels = document.getElementById('newLabels').value.trim();
       if (!source) return showToast(t('err_need_source'), 'error');
-      await fetchJson('/api/sources', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ source, name, labels })
-      });
-      document.getElementById('newSource').value = '';
-      document.getElementById('newName').value = '';
-      document.getElementById('newLabels').value = '';
-      await refreshStatus();
-      showToast(t('toast_source_added'));
+      try {
+        await fetchJson('/api/sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, name, labels })
+        }, 30000);
+        document.getElementById('newSource').value = '';
+        document.getElementById('newName').value = '';
+        document.getElementById('newLabels').value = '';
+        await refreshStatus();
+        showToast(t('toast_source_added'));
+      } catch (e) {
+        if (!(e instanceof AuthError)) showToast(t('toast_save_failed', { msg: e.message }), 'error');
+      }
     }
 
     async function saveSourceConfig(sourceId) {
-      const name = document.getElementById(`name-${sourceId}`).value.trim();
-      const labels = document.getElementById(`labels-${sourceId}`).value.trim();
-      const model = document.getElementById(`model-${sourceId}`).value;
-      await fetchJson(`/api/sources/${sourceId}`, {
-        method:'PUT',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ name, labels, model })
-      });
-      pendingSourceModels.delete(sourceId);
-      pendingSourceNames.delete(sourceId);
-      pendingSourceLabels.delete(sourceId);
-      await refreshStatus();
-      showToast(t('toast_source_saved'));
+      try {
+        await fetchJson(`/api/sources/${encodeURIComponent(sourceId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById(`name-${sourceId}`).value.trim(),
+            labels: document.getElementById(`labels-${sourceId}`).value.trim(),
+            model: document.getElementById(`model-${sourceId}`).value
+          })
+        }, 30000);
+        pendingSourceModels.delete(sourceId);
+        pendingSourceNames.delete(sourceId);
+        pendingSourceLabels.delete(sourceId);
+        await refreshStatus();
+        showToast(t('toast_source_saved'));
+      } catch (e) {
+        if (!(e instanceof AuthError)) showToast(t('toast_save_failed', { msg: e.message }), 'error');
+      }
     }
 
     async function cloneSource(sourceId) {
       const src = latestSourceStatus.get(sourceId);
       if (!src) return showToast(t('err_source_read_failed'), 'error');
-      const cloneName = `${src.name || sourceId}_copy`;
-      const labels = src.labels_text || '';
       const model = pendingSourceModels.get(sourceId) || src.model || document.getElementById('modelSelect').value;
       try {
-        const r = await fetchJson('/api/sources', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ source: src.source, name: cloneName, labels })
-        });
-        if (r.source_id && model) {
-          await fetchJson(`/api/sources/${r.source_id}`, {
-            method:'PUT',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ model })
-          });
-        }
+        await fetchJson('/api/sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: src.source,
+            name: `${src.name || sourceId}_copy`,
+            labels: src.labels_text || '',
+            model
+          })
+        }, 30000);
         await refreshStatus();
         showToast(t('toast_source_cloned'));
       } catch (e) {
-        showToast(t('toast_clone_failed', { msg: e.message }), 'error');
+        if (!(e instanceof AuthError)) showToast(t('toast_clone_failed', { msg: e.message }), 'error');
       }
     }
 
     async function removeSource(sourceId) {
-      if(!confirm(t('confirm_delete_source'))) return;
-      await fetchJson(`/api/sources/${sourceId}`, { method:'DELETE' });
-      await refreshStatus();
-      showToast(t('toast_source_deleted'));
+      if (!confirm(t('confirm_delete_source'))) return;
+      try {
+        await fetchJson(`/api/sources/${encodeURIComponent(sourceId)}`, { method: 'DELETE' });
+        await refreshStatus();
+        showToast(t('toast_source_deleted'));
+      } catch (e) {
+        if (!(e instanceof AuthError)) showToast(t('toast_save_failed', { msg: e.message }), 'error');
+      }
     }
 
     async function uploadModel() {
@@ -956,34 +1011,49 @@
       if (!f) return showToast(t('err_choose_pt'), 'error');
       const fd = new FormData();
       fd.append('file', f);
-      await fetchJson('/api/models/upload', { method:'POST', body:fd });
-      await refreshModels();
-      showToast(t('toast_upload_done'));
+      try {
+        await fetchJson('/api/models/upload', { method: 'POST', body: fd }, 600000);
+        await refreshModels();
+        showToast(t('toast_upload_done'));
+      } catch (e) {
+        if (!(e instanceof AuthError)) showToast(t('toast_save_failed', { msg: e.message }), 'error');
+      }
     }
 
     async function activateModel() {
       const name = document.getElementById('modelSelect').value;
       if (!name) return showToast(t('err_no_model'), 'error');
-      await fetchJson('/api/models/activate', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ name })
-      });
-      pendingGlobalModel = '';
-      await refreshStatus();
-      showToast(t('toast_model_switched'));
+      try {
+        await fetchJson('/api/models/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        }, 60000);
+        pendingGlobalModel = '';
+        await refreshStatus();
+        showToast(t('toast_model_switched'));
+      } catch (e) {
+        if (!(e instanceof AuthError)) showToast(t('toast_save_failed', { msg: e.message }), 'error');
+      }
     }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeZoom(); });
+    document.getElementById('authToken').addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitToken();
+    });
 
     async function init() {
       applyLanguage();
       await refreshModels();
       await refreshMqtt();
       await refreshStatus();
-      setInterval(refreshStatus, 2500);
+      if (statusTimer) clearInterval(statusTimer);
+      statusTimer = setInterval(() => refreshStatus().catch(() => {}), STATUS_POLL_MS);
     }
 
     init().catch(e => {
-      document.getElementById('status').innerHTML = `<span class="text-red-400">${t('status_init_failed', { msg: e.message })}</span>`;
+      if (e instanceof AuthError) return;
+      document.getElementById('status').textContent = t('status_init_failed', { msg: e.message });
     });
   </script>
 </body>

@@ -1,11 +1,18 @@
 __pycache__/
 *.pyc
 .venv/
+venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .DS_Store
 Thumbs.db
 .env
+*.bak
+*.bak_*
+
 models/*.pt
 !models/.keep
+
+# Runtime state (persisted cameras and MQTT settings)
+data/

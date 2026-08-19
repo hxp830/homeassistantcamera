@@ -1,0 +1,25 @@
+[project]
+name = "gesture-yolo-ha"
+version = "1.1.0"
+description = "Multi-source gesture recognition bridge for Home Assistant (YOLO + MediaPipe + MQTT)"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+# These one-off scripts embed remote source code in string literals; reformatting
+# them would change the payload they patch.
+extend-exclude = ["tools/remote_patches"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = [
+    # Module-level imports after the OpenCV FFmpeg env var is set (detector.py).
+    "E402",
+    # FastAPI declares dependencies as argument defaults: File(...), Depends(...).
+    "B008",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
